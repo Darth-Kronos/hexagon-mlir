@@ -1,6 +1,75 @@
 This document explains how to set up a **local development environment** for working on the Hexagon-MLIR + Triton integration.
 
-# Overview 
+# Script-Based Setup
+We provide a script `scripts/local_build.sh` that automates much of the setup process of building a complete `Hexagon-MLIR + Triton` environment locally, including: 
+
+* Submodule setup for `triton` and `triton_shared`.
+* Downloading and extracting Hexagon SDK, Hexagon Tools, and Hexagon Kernel Library (HexKL).
+* Downloading and building the required LLVM version for Triton.
+* Creating a Python virtual environment and installing required Python packages.
+* Building Triton with Hexagon backend support and running tests.
+
+## Assumptions of the Script
+
+### Directory Layout: This script assumes the following directory structure:
+
+# HEXAGON_TOOLS, SDK, LLVM are present in same dir as repo root not iside repo
+# LLVM_DIR HAS LLVM PROJECT
+```
+/path/to/workspace/
+    HEXAGON-MLIR/            # HEXAGON-MLIR repo root (your git checkout)
+        scripts/
+        triton/
+        qcom_hexagon_backend/
+        ...                  # other repo files
+
+    HEXAGON_SDK/             # Extracted Hexagon SDK
+        Hexagon_SDK/
+            6.4.0.2/
+                ...          # SDK contents
+
+    HEXAGON_TOOLS/           # Extracted Hexagon Tools
+        Tools/
+            bin/
+            lib/
+            include/
+            ...
+
+    HEXKL_DIR/               # Extracted Hexagon KL addon
+        hexkl_addon/
+            ...
+
+    HOST_TOOLCHAIN/          # Downloaded Clang/LLVM 13 toolchain
+        bin/
+        lib/
+        include/
+        ...
+
+    LLVM_DIR/                # Directory for LLVM build
+        llvm-project/            # LLVM source checkout
+            llvm/                # LLVM source tree
+            mlir/                # MLIR source tree
+            lld/                 # LLD source tree
+            build/               # LLVM build directory
+                bin/
+                lib/
+                include/
+                install/         # LLVM install prefix
+    mlir-env/                # Python virtual environment
+        bin/
+        lib/
+        include/
+        ...
+```
+
+## Running the Script
+To run the script, navigate to the root of the `HEXAGON-MLIR` repository and execute:
+
+```bash
+bash ./scripts/local_build.sh
+```
+
+# Overview of the Manual Setup
 
 Local development requires downloading several components: 
 
@@ -144,20 +213,6 @@ Then set:
 `export CONDA_ENV=/path/to/mlir-env`
 
 (Letting developers choose between a miniconda or a Python virtual env, the variable name is still CONDA_ENV for consistency.)
-
-## Verifying your setup
-
-```bash
-./scripts/check_local_env.sh
-```
-
-This script verifies:
-
-* All required environment variables
-* All required directories
-* LLVM build completeness (`mlir-opt` exists)
-* triton and triton_shared submodule presence
-* Python interpreter inside your environment
 
 ## Building Triton Locally
 
