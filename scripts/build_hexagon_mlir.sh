@@ -121,8 +121,8 @@ LLVM_PROJECT_BUILD_DIR="${LLVM_SRC_DIR}/build"
 LLVM_INSTALL_DIR="${LLVM_PROJECT_BUILD_DIR}/install"
 
 cd ${BASE_DIR}
-mkdir -p "${LLVM_TOP_DIR}"
-cd ${LLVM_TOP_DIR}
+# mkdir -p "${LLVM_TOP_DIR}"
+# cd ${LLVM_TOP_DIR}
 
 # Clone llvm-project if it doesn't exist
 if [[ ! -d "${LLVM_SRC_DIR}/.git" ]]; then
@@ -178,12 +178,12 @@ else
 fi
 # Activate it
 source "$ENV_DIR/bin/activate"
-pip install -r ${REPO_DIR}/ci/requirements.txt
+
 
 export CONDA_ENV=${BASE_DIR}/mlir-env
 
 cd ${REPO_DIR}
-source scripts/build_local_triton.sh
+source scripts/build_triton.sh
 
 
 if [[ -d ./triton/build ]]; then

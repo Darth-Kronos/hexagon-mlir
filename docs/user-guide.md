@@ -11,14 +11,20 @@
   - [Python Setup](#python-setup)
   - [Set Hexagon architecture](#set-hexagon-architecture)
 - [Building Hexagon-MLIR Compiler](#building-hexagon-mlir-compiler)
-  - [Clone Repository](#clone-repository)
-  - [Software Dependencies](#software-dependencies)
-    - [Install Python Packages](#install-python-packages)
-    - [Install Hexagon SDK and Tools](#install-hexagon-sdk-and-tools)
-    - [Build Verified LLVM](#build-verified-llvm)
-    - [Setup Host Toolchain LLVM](#setup-host-toolchain-llvm)
-    - [Build Hexagon-MLIR](#build-hexagon-mlir)
-    - [Set Environment Variables for Testing](#set-environment-variables-for-testing)
+    - [Clone Repository](#clone-repository)
+    - [Script-based Build](#script-based-build)
+    - [Overview of the Manual Setup](#overview-of-the-manual-setup)
+        - [Required Environment Variables](#required-environment-variables)
+        - [Installing Required Components](#installing-required-components)
+            - [triton submodule](#triton-submodule)
+            - [triton_shared submodule](#triton_shared-submodule)
+            - [Hexagon SDK](#hexagon-sdk)
+            - [Hexagon Tools](#hexagon-tools)
+            - [Hexagon Kernel Library (HexKL)](#hexagon-kernel-library-hexkl)
+            - [Download the clang toolchain](#download-the-clang-toolchain)
+        - [Building LLVM for Triton](#building-llvm-for-triton)
+        - [Creating a Python Environment](#creating-a-python-environment)
+        - [Building Triton Locally](#building-triton-locally)
 - [Verify the Setup](#verify-the-setup)
   - [Step 1: Verify Build Tools](#step-1-verify-build-tools)
   - [Step 2: Run LIT Tests](#step-2-run-lit-tests)
@@ -92,111 +98,179 @@ export HEXAGON_MLIR_ROOT=$PWD
 export TRITON_ROOT=$HEXAGON_MLIR_ROOT/triton
 ```
 
-### Software Dependencies
-- **Python Packages**: Listed in buildbot/requirements.txt
-- **Hexagon SDK**: Version 6.4.0.0
-- **Hexagon Tools**: Version 21.0
-- **LLVM/MLIR**: Custom build for Hexagon target
-- **Host Toolchain**: clang+llvm-13.0.1
-- **(Optional) Hexagon Kernel Library**: Version 1.0
+### Script-based Build
 
-Set up steps follow the above order:
+We provide a script `HEXAGON_MLIR_ROOT/scripts/build_hexagon_mlir.sh` that automates much of the setup process of building a complete `Hexagon-MLIR + Triton` environment locally, including: 
 
-### Install Python Packages
+* Submodule setup for `triton` and `triton_shared`.
+* Downloading and extracting Hexagon SDK, Hexagon Tools, and Hexagon Kernel Library (HexKL).
+* Downloading and building the required LLVM version for Triton.
+* Creating a Python virtual environment and installing required Python packages.
+* Building Triton with Hexagon backend support and running tests.
 
-The command below instructs pip (Python's package manager) to install dependencies e.g.:
-- dependencies that are needed to build, test, and run the Hexagon‑MLIR.
-- exact **PyTorch** stack and the **Torch‑MLIR** bridge, ensuring model conversion to MLIR works reproducibly.
+To run the script, navigate to the root of the `hexagon-mlir` repository and execute:
 
 ```bash
-pip install -r buildbot/requirements.txt
+bash ./scripts/build_hexagon_mlir.sh
 ```
 
+However, if you prefer to set up the environment manually, follow the steps below.
 
-### Install Hexagon SDK and Tools
-Skip the download/install steps if you already have access to:
-- Hexagon SDK 6.4.0.0
-- Hexagon Tools 21.0
-- (Optional) Hexagon Kernel Library 1.0
+### Overview of the Manual Setup
 
-#### QPM For Internal (to Qualcomm) Developers 
-1. Join [hexagonsdk.users](https://lists.qualcomm.com/ListManager?match=eq&field=default&query=hexagonsdk.users)
-2. Download and install QPM from [an internal source](https://qpm.qualcomm.com/#/main/tools/details/QPM3)
+Local development requires downloading several components: 
 
-#### QPM For External (to Qualcomm) Developers
-Download and install QPM from [here](https://softwarecenter.qualcomm.com/catalog/item/QPM3).
-<!-- TODO: Add an installation option (once we find one) that doesn't require QPM credentials -->
+* [Hexagon SDK 6.4.0.2](https://softwarecenter.qualcomm.com/catalog/item/Hexagon_SDK)
+* [Hexagon Tools 19.0.02](https://softwarecenter.qualcomm.com/catalog/item/Hexagon_open_access)
+* [Hexagon Kernel Library (HexKL 1.0.0)](https://softwarecenter.qualcomm.com/catalog/item/Hexagon_KL)
+* LLVM (Triton-compatible)
+* Python Virtual Environment
+* [triton](https://github.com/triton-lang/triton)
+* [triton-shared](https://github.com/microsoft/triton-shared)
 
-#### Download and Install via QPM
-Install Hexagon SDK 6.4.0.0:
+#### Required Environment Variables
+
+Export the following environment variables 
+
 ```bash
-# Login and activate license
-qpm-cli --login
-qpm-cli --license-activate hexagonsdk6.x
-# Set SDK_INSTALL_PATH to your desired install location
-qpm-cli --extract hexagonsdk6.x --version 6.4.0.0 --path $SDK_INSTALL_PATH
-```
-Install Hexagon Tools 21.0:
-```bash
-qpm-cli --license-activate Hexagon21.0
-# Set TOOLS_INSTALL_PATH to your desired install location
-qpm-cli --extract Hexagon21.0 --path $TOOLS_INSTALL_PATH
+export HEXAGON_SDK_ROOT=/path/to/Hexagon_SDK/6.4.0.2
+export HEXAGON_TOOLS=/path/to/Tools
+export HEXKL_ROOT=/path/to/hexkl_addon
+export LLVM_PROJECT_BUILD_dir=/path/to/llvm/build
+export CONDA_ENV=/path/to/your/python/env
 ```
 
-#### Configure Hexagon Dependencies
+#### Installing Required Components
+
+##### triton submodule
+Set up the triton submodule and apply Qualcomm specific patches. 
+
 ```bash
-# If skipping the download steps, see above for how SDK_INSTALL_PATH and TOOLS_INSTALL_PATH must be set
-# Run SDK setup script (setting HEXAGON_SDK_ROOT)
-source $SDK_INSTALL_PATH/setup_sdk_env.source
-# Set tools path
-export HEXAGON_TOOLS=$TOOLS_INSTALL_PATH/Tools
-# Set HEXKL_ROOT to the HexKL(Hexagon kernel library) installation path
-export HEXKL_ROOT=<HEXKL_INSTALL_PATH>/sdkl_addon
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "${REPO_ROOT}"
+git submodule add --force https://github.com/triton-lang/triton.git triton
+cd triton
+git checkout e44bd1c83c1c3e8deac7c4f02683cfb3cc395c8b
+git apply "${REPO_ROOT}/third_party_software/patches/triton/third_party_triton.patch"
 ```
 
-### Build Verified LLVM
+##### triton_shared submodule
+Set up the triton_shared submodule and apply Qualcomm specific patches.
+
 ```bash
-# Use the provided build script, which builds:
-#   - For a Hexagon backend
-#   - From an LLVM SHA we've verified for hexagon-mlir
-#   - Ensuring required LLVM projects are built (e.g. lld)
-source buildbot/build_llvm.sh -s <path_to_llvm_to_be_built>
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "${REPO_ROOT}"
+git submodule add --force https://github.com/microsoft/triton-shared triton_shared
+cd triton_shared
+git checkout 2b728ad97bc02af821a0805b09075838911d4c19
+git apply "${REPO_ROOT}/third_party_software/patches/triton_shared/max_with_nan_propagation.patch"
+git apply "${REPO_ROOT}/third_party_software/patches/triton_shared/tt_shared_split_dim.patch"
 ```
 
-### Setup Host Toolchain LLVM
-Download and install host toolchain:
+##### Hexagon SDK
+
+```bash 
+wget https://softwarecenter.qualcomm.com/api/download/software/sdks/Hexagon_SDK/Linux/Debian/6.4.0.2/Hexagon_SDK_lnx.zip
+unzip -q Hexagon_SDK_lnx.zip 
+export HEXAGON_SDK_ROOT=/path/to/Hexagon_SDK/6.4.0.2
+```
+
+##### Hexagon Tools
+
+```bash
+wget https://softwarecenter.qualcomm.com/api/download/software/tools/Hexagon_open_access/Linux/Debian/19.0.02/Hexagon_open_access.Core.19.0.02.Linux-Any.tar.gz
+tar -xzf Hexagon_open_access.Core.19.0.02.Linux-Any.tar.gz
+export HEXAGON_TOOLS=/path/to/Tools
+```
+
+##### Hexagon Kernel Library (HexKL)
+
+* Download the HexKL package.
+* Extract the outer zip.
+* Extract the inner zip (e.g., hexkl-1.0.0-beta1-6.4.0.0.zip).
+* Locate the `hexkl_addon` directory. 
+
+```bash
+wget https://softwarecenter.qualcomm.com/api/download/software/tools/Hexagon_KL/Linux/1.0.0/Hexagon_KL.Core.1.0.0.Linux-Any.zip
+unzip Hexagon_KL.Core.1.0.0.Linux-Any.zip 
+unzip hexkl-1.0.0-beta1-6.4.0.0.zip
+export HEXKL_ROOT=/path/to/hexkl_addon
+```
+
+##### Download the clang toolchain
+
 ```bash
 wget https://github.com/llvm/llvm-project/releases/download/llvmorg-13.0.1/clang+llvm-13.0.1-x86_64-linux-gnu-ubuntu-18.04.tar.xz
-tar -xf clang+llvm-13.0.1-x86_64-linux-gnu-ubuntu-18.04.tar.xz
-export HOST_TOOLCHAIN=$(pwd)/clang+llvm-13.0.1-x86_64-linux-gnu-ubuntu-18.04
-export PATH=$HOST_TOOLCHAIN/bin:$PATH
+tar -xf clang+llvm-13.0.1-x86_64-linux-gnu-ubuntu-18.04.tar.xz --strip-components=1
+export HOST_TOOLCHAIN=/path/to/clang+llvm-13.0.1-x86_64-linux-gnu-ubuntu-18.04
+export PATH="${HOST_TOOLCHAIN}/bin:${PATH}"
+export CC="${HOST_TOOLCHAIN}/bin/clang"
+export CXX="${HOST_TOOLCHAIN}/bin/clang++"
 ```
 
-###  Build Hexagon-MLIR
+#### Building LLVM for Triton 
+
+Triton requires a specific LLVM revision; and you can find the expected hash in `triton/cmake/llvm-hash.txt`
+
+##### Build Steps
 ```bash
-# Build the Hexagon-MLIR backend
-cd $TRITON_ROOT
-TRITON_HOME=$HEXAGON_MLIR_ROOT/.. \
-TRITON_PLUGIN_DIRS="$HEXAGON_MLIR_ROOT/triton_shared;$HEXAGON_MLIR_ROOT/qcom_hexagon_backend" \
-TRITON_BUILD_WITH_CLANG_LLD=1 \
-TRITON_BUILD_WITH_CCACHE=true \
-LLVM_INCLUDE_DIRS=$LLVM_INSTALL_DIR/include \
-LLVM_LIBRARY_DIR=$LLVM_INSTALL_DIR/lib \
-LLVM_SYSPATH=$LLVM_INSTALL_DIR \
-pip install -e . --no-build-isolation --verbose
-cd $HEXAGON_MLIR_ROOT
-# This builds:
-# - Triton with Hexagon backend
-# - linalg-hexagon-opt, linalg-hexagon-translate, triton-shared-opt
-# - Python bindings
+git clone https://github.com/llvm/llvm-project.git
+cd llvm-project
+git checkout <hash-from-triton>
+
+mkdir build && cd build
+cmake -G "Ninja" ../llvm \
+    -DLLVM_ENABLE_PROJECTS="llvm;mlir;lld" \
+    -DCMAKE_C_COMPILER="${CC}" \
+    -DCMAKE_CXX_COMPILER="${CXX}" \
+    -DCMAKE_ASM_COMPILER="${CC}" \
+    -DLLVM_BUILD_EXAMPLES=ON \
+    -DLLVM_INSTALL_UTILS=ON \
+    -DLLVM_TARGETS_TO_BUILD="AMDGPU;NVPTX;X86;Hexagon" \
+    -DCMAKE_BUILD_TYPE="RelWithDebInfo" \
+    -DLLVM_ENABLE_ASSERTIONS=ON \
+    -DLLVM_ENABLE_RTTI=ON \
+    -DLLVM_CCACHE_BUILD:BOOL=ON \
+    -DLLVM_ENABLE_EH=ON \
+    -DLLVM_BUILD_EXAMPLES:BOOL=OFF \
+    -DCMAKE_EXPORT_COMPILE_COMMANDS=1 \
+    -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-linux-gnu \
+    -DCMAKE_INSTALL_PREFIX="${LLVM_PROJECT_BUILD_DIR}/install"
 ```
 
-### Set Environment Variables for Testing
+Set:
+`export LLVM_PROJECT_BUILD_DIR=/path/to/llvm-project/build`
+
+#### Creating a Python Environment
+
+Example using `venv`:
+
 ```bash
-export TRITON_SHARED_OPT_PATH=$TRITON_ROOT/build/cmake.linux-x86_64-cpython-3.11/third_party/triton_shared/tools/triton-shared-opt/triton-shared-opt
-export PATH=$TRITON_ROOT/build/cmake.linux-x86_64-cpython-3.11/third_party/qcom_hexagon_backend/bin/:$TRITON_ROOT/build/cmake.linux-x86_64-cpython-3.11/third_party/triton_shared/tools/triton-shared-opt:$PATH
-export PYTHONPATH=$TRITON_ROOT/python:$HEXAGON_MLIR_ROOT:$PYTHONPATH
+python3 -m venv mlir-env
+source mlir-env/bin/activate
+pip install --upgrade pip setuptools wheel
+pip install -r ci/requirements.txt
 ```
+
+Then set:
+
+`export CONDA_ENV=/path/to/mlir-env`
+
+(Letting developers choose between a miniconda or a Python virtual env, the variable name is still CONDA_ENV for consistency.)
+
+#### Building Triton Locally
+
+Once your environment is valid:
+
+```bash
+./scripts/build_local_triton.sh
+```
+
+This script:
+
+* Sources the environment
+* Activates your Python environment
+* Builds Triton using your local LLVM
 
 ## Verify the Setup
 ### Step 1: Verify Build Tools
@@ -204,7 +278,7 @@ Check that the build was successful by locating key tools:
 ```bash
 # Find the main developer tool
 find . -name linalg-hexagon-opt
-# Expected output: ./triton/build/cmake.linux-x86_64-cpython-3.11/third_party/qcom_hexagon_backend/bin/linalg-hexagon-opt
+# Expected output: ./triton/build/cmake.linux-x86_64-cpython-${PYTHON_VERSION}/third_party/qcom_hexagon_backend/bin/linalg-hexagon-opt
 
 # Verify tool is accessible
 which linalg-hexagon-opt
@@ -212,8 +286,11 @@ which linalg-hexagon-opt
 
 ### Step 2: Run LIT Tests
 ```bash
-lit triton/build/cmake.linux-x86_64-cpython-3.11/third_party/qcom_hexagon_backend/test/
+lit triton/build/cmake.linux-x86_64-cpython-${PYTHON_VERSION}/third_party/qcom_hexagon_backend/test/
 ```
+
+*NOTE*: Steps 3 and 4 are only applicable if you have access to a Qualcomm Hexagon NPU device.
+If you do not have access to such a device, you can skip these steps; however, please contact us at [hexagon-mlir.support@qti.qualcomm.com](mailto:hexagon-mlir.support@qti.qualcomm.com) for assistance in obtaining access to a test device.
 
 ### Step 3: Run Triton Test
 If you have access to a Qualcomm NPU device, please set the variables ANDROID_HOST and ANDROID_SERIAL to the host name and hexagon device number.
@@ -241,5 +318,3 @@ pytest -sv test/python/torch-mlir/test_softmax_torch.py
 - [Triton Language Reference](https://triton-lang.org/main/python-api/triton.language.html) - Language documentation
 - [Triton Tutorials](https://triton-lang.org/main/getting-started/tutorials/index.html) - Learning resources
 - [Triton-Shared Middle Layer](https://github.com/microsoft/triton-shared) - Triton to Linalg toolchain
-
-

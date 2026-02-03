@@ -9,17 +9,14 @@ set -euo pipefail
 set -x
 
 HEXAGON_MLIR_ROOT="$(git rev-parse --show-toplevel)"
-CHECK_SCRIPT="$HEXAGON_MLIR_ROOT/scripts/check_local_env.sh"
 
-echo "=== Running environment checks ==="
-source "$CHECK_SCRIPT"
-
-echo "=== Activating Python environment ==="
 
 echo "=== Upgrading pip tooling ==="
 pip install --upgrade pip setuptools wheel
+echo "=== Installing triton and torch-mlir build requirements ==="
+pip install -r ${REPO_DIR}/ci/requirements.txt
 
-echo "=== Building Triton ==="
+echo "=== Building triton ==="
 cd "$HEXAGON_MLIR_ROOT/triton"
 
 
