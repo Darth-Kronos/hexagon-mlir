@@ -268,7 +268,7 @@ export TRITON_ROOT=$HEXAGON_MLIR_ROOT/triton
 export TRITON_SHARED_OPT_PATH=$TRITON_ROOT/build/cmake.linux-x86_64-cpython-${PYTHON_VERSION}/third_party/triton_shared/tools/triton-shared-opt/triton-shared-opt
 export TRITON_HOME=$HEXAGON_MLIR_ROOT
 export TRITON_PLUGIN_DIRS="$HEXAGON_MLIR_ROOT/triton_shared;$HEXAGON_MLIR_ROOT/qcom_hexagon_backend"
-export PATH=/prj/qct/llvm/devops/build_tools/triton/adb_tool:$TRITON_ROOT/build/cmake.linux-x86_64-cpython-${PYTHON_VERSION}/third_party/qcom_hexagon_backend/bin/:$TRITON_ROOT/build/cmake.linux-x86_64-cpython-${PYTHON_VERSION}/third_party/triton_shared/tools/triton-shared-opt:$PATH
+export PATH=$TRITON_ROOT/build/cmake.linux-x86_64-cpython-${PYTHON_VERSION}/third_party/qcom_hexagon_backend/bin/:$TRITON_ROOT/build/cmake.linux-x86_64-cpython-${PYTHON_VERSION}/third_party/triton_shared/tools/triton-shared-opt:$PATH
 export PYTHONPATH=$TRITON_ROOT/python:$PYTHONPATH
 ```
 *Note*: Replace `${PYTHON_VERSION}` with your actual Python version, e.g., `3.11`. `HEXAGON_MLIR_ROOT/scripts/set_local_env.sh` is a good reference for setting these variables.
