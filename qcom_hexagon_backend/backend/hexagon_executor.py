@@ -41,7 +41,7 @@ class HexagonExecutor:
                                  calling the `get_config` method.
         """
         self.exec_mode = get_exec_mode() if not compile_only else "compile_only"
-        self.device_path = "/vendor/bin"
+        self.device_path = "/data/local/tmp/hexagon_test"
         self.config = self.get_config()
         self.enable_lwp = enable_lwp
         self.enable_etm = enable_etm  # When set to True, etm traces will be collected and processed with pyetm.
@@ -213,7 +213,7 @@ class HexagonExecutor:
             HEXAGON_SDK_ROOT=self.config.env_vars["HEXAGON_SDK_ROOT"],
             Q6_VERSION=self.config.Q6_VERSION,
         )
-        QHL_LINK_DIR = """{HEXAGON_SDK_ROOT}/libs/qhl_hvx/prebuilt/hexagon_toolv87_v{Q6_VERSION}""".format(
+        QHL_LINK_DIR = """{HEXAGON_SDK_ROOT}/libs/qhl_hvx/prebuilt/hexagon_toolv88_v{Q6_VERSION}""".format(
             HEXAGON_SDK_ROOT=self.config.env_vars["HEXAGON_SDK_ROOT"],
             Q6_VERSION=self.config.Q6_VERSION,
         )
@@ -330,7 +330,7 @@ class HexagonExecutor:
         )
         librun_main_on_hexagon_skel_path = os.path.join(
             self.config.env_vars["HEXAGON_SDK_ROOT"],
-            "libs/run_main_on_hexagon/ship/hexagon_toolv87_v{}/librun_main_on_hexagon_skel.so".format(
+            "libs/run_main_on_hexagon/ship/hexagon_toolv88_v{}/librun_main_on_hexagon_skel.so".format(
                 self.config.Q6_VERSION
             ),
         )
@@ -418,6 +418,24 @@ class HexagonExecutor:
         #     command - Command to possible run
         #     should_run - Boolean to check if we should run the command
         commands = [
+            # Setup writable directory
+            (
+                "adb {} -s {} shell mkdir -p {}".format(
+                    self.config.env_vars["ANDROID_HOST"],
+                    self.config.env_vars["ANDROID_SERIAL"],
+                    self.device_path,
+                ),
+                True,
+            ),
+            # Cleanup writable directory (just in case)
+            (
+                "adb {} -s {} shell 'rm -rf {}/*'".format(
+                    self.config.env_vars["ANDROID_HOST"],
+                    self.config.env_vars["ANDROID_SERIAL"],
+                    self.device_path,
+                ),
+                True,
+            ),
             # Remove the output tensors and kernel.so from any previous run
             (
                 "adb {} -s {} shell 'rm -rf {}'".format(
@@ -448,19 +466,21 @@ class HexagonExecutor:
             ),
             # Push run_main_on_hexagon skel library
             (
-                "adb {} -s {} push {} /vendor/lib/rfsa/adsp".format(
+                "adb {} -s {} push {} {}".format(
                     self.config.env_vars["ANDROID_HOST"],
                     self.config.env_vars["ANDROID_SERIAL"],
                     librun_main_on_hexagon_skel_path,
+                    self.device_path,
                 ),
                 True,
             ),
             # Push libc++.so.1 library specific to hexagon-tools and Q6 version
             (
-                "adb {} -s {} push {} /vendor/lib/rfsa/adsp".format(
+                "adb {} -s {} push {} {}".format(
                     self.config.env_vars["ANDROID_HOST"],
                     self.config.env_vars["ANDROID_SERIAL"],
                     libcpp_path,
+                    self.device_path,
                 ),
                 True,
             ),
@@ -476,11 +496,12 @@ class HexagonExecutor:
                 ),
                 self.enable_etm,
             ),
-            # Run the kernel using run_main_on_hexagon
+            # Run with ADSP_LIBRARY_PATH. chmod is required for binaries in /data/local/tmp
             (
-                "adb {} -s {} shell 'cd {}; touch /vendor/lib/rfsa/adsp/run_main_on_hexagon.farf; ./run_main_on_hexagon 3 {}'".format(
+                "adb {} -s {} shell 'export ADSP_LIBRARY_PATH=\"{}\"; cd {}; chmod +x ./run_main_on_hexagon; ./run_main_on_hexagon 3 {}'".format(
                     self.config.env_vars["ANDROID_HOST"],
                     self.config.env_vars["ANDROID_SERIAL"],
+                    self.device_path,
                     self.device_path,
                     path_to_principal_lib_on_device,
                 ),
@@ -494,7 +515,7 @@ class HexagonExecutor:
                     " ".join(output_device_paths),
                     # Assumption: All output_paths have same dirname
                     # Append a random entry to make sure the list in not empty.
-                    os.path.dirname((output_paths + ["/invalid/dir"])[0]),
+                    os.path.dirname((output_paths + ["/tmp"])[0]),
                 ),
                 bool(output_paths),
             ),
@@ -657,7 +678,7 @@ class HexagonExecutor:
                 --l2tcm_base 0xd800 \
                 --rtos {} \
                 {}/rtos/qurt/computev{}/sdksim_bin/runelf.pbn -- \
-                {}/libs/run_main_on_hexagon/ship/hexagon_toolv87_v{}/run_main_on_hexagon_sim \
+                {}/libs/run_main_on_hexagon/ship/hexagon_toolv88_v{}/run_main_on_hexagon_sim \
                 stack_size=0x400000 -- \
                 {}"
             ).format(
