@@ -15,6 +15,10 @@
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/raw_ostream.h"
+
 namespace mlir {
 namespace hexagon {
 
@@ -59,6 +63,29 @@ static bool isEnvTrue(const char *name) {
     return envStr == "on" || envStr == "true" || envStr == "1";
   }
   return false;
+}
+
+/// Get the output stream for MLIR dumps.
+/// If MLIR_DUMP_PATH is set, returns a file stream to that path.
+/// Otherwise, returns llvm::dbgs() (stderr).
+static llvm::raw_ostream &getMlirDumpStream() {
+  static std::unique_ptr<llvm::raw_fd_ostream> fileStream;
+
+  if (const char *dumpPath = std::getenv("MLIR_DUMP_PATH")) {
+    if (!fileStream) {
+      std::error_code EC;
+      fileStream = std::make_unique<llvm::raw_fd_ostream>(
+          dumpPath, EC, llvm::sys::fs::OF_None);
+      if (EC) {
+        llvm::errs() << "Warning: Failed to open MLIR_DUMP_PATH '" << dumpPath
+                     << "': " << EC.message() << "\n";
+        llvm::errs() << "Falling back to stderr for MLIR dumps.\n";
+        return llvm::dbgs();
+      }
+    }
+    return *fileStream;
+  }
+  return llvm::dbgs();
 }
 
 } // namespace hexagon

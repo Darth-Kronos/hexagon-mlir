@@ -125,7 +125,8 @@ mlir::ModuleOp translateLinalgToLLVMMLIR(
       },
       /*printModuleScope=*/false,
       /*printAfterOnlyOnChange=*/true,
-      /*printAfterOnlyOnFailure*/ false, llvm::dbgs(), printingFlags);
+      /*printAfterOnlyOnFailure*/ false,
+      mlir::hexagon::getMlirDumpStream(), printingFlags);
 
   // set your enable/disable individual pass options here
   // or funnel to here.
